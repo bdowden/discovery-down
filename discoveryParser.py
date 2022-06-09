@@ -6,14 +6,12 @@ import requests
 class DiscoveryParser:
     def __init__(self, config):
         self.config = config
-        self.url = none
 
-        if (os.path.exists(config.cookiePath)) {
-            self.cookiePath = config.cookiePath
-        }
+        if (os.path.exists(config['cookiePath'])):
+            self.cookiePath = config['cookiePath']
     
-    def retrieveShowData(url):
-        cj = MozillaCookieJar(cookiePath)
+    def retrieveShowData(self, url):
+        cj = MozillaCookieJar(self.cookiePath)
         cj.load(ignore_discard=True, ignore_expires=True)
 
         url_slug = "deadliest-catch"
@@ -25,7 +23,7 @@ class DiscoveryParser:
             "x-disco-client": "WEB:UNKNOWN:dplus_us:1.8.0",
             "x-disco-params": "realm=go,siteLookupKey=dplus_us,features=ar",
             "accept": "*/*",
-            "accept-language", "en-US,en;q=0.9"
+            "accept-language": "en-US,en;q=0.9"
         }
 
         s.cookies = cj
@@ -34,7 +32,7 @@ class DiscoveryParser:
 
         cj.save(ignore_discard=True, ignore_expires=True)
 
-        return result
+        return result.json()
 
 
 
