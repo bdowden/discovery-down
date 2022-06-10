@@ -1,82 +1,26 @@
 from discoveryParser import DiscoveryParser
+from discoveryShow import DiscoveryShow
 import pathlib
-import re
+import subprocess
 
 cookiePath = str(pathlib.Path(__file__).parent.absolute() / "cookie.txt") 
 
 parser = DiscoveryParser({"cookiePath": cookiePath})
 
-result = parser.retrieveShowData("")
+show = parser.retrieveShowData("")
 
-included = result['included']
+url = show.episodeUrls[0]
 
+args = ["yt-dlp", "--cookies", f"{cookiePath}", "-v", "--hls-prefer-ffmpeg", "--extractor-retries", "10", "--ignore-config", "-N50", "-o", "S%(season_number)02dE%(episode_number)02d.%(title)s.%(ext)s", url]
 
-show_id_regex = '.*pf\[show\.id\]=(\d+).*'
-show_entry_regex = ".*pf\[show\.id\].*"
+result = subprocess.run (args, capture_output=True, text=True)
 
-show_id = None
+print ('err: ', result.stderr)
+print ('output: ', result.stdout)
 
-for include in included:
-  if (not 'attributes' in include):
-    continue
-
-  attributes = include['attributes']
-
-  if (not 'component' in attributes):
-    continue
-
-  component = attributes['component']
-
-  if (not 'mandatoryParams' in component):
-    continue
-
-  mandatoryParams = component['mandatoryParams']
-
-  result = re.match(show_entry_regex, mandatoryParams)
-
-  if (not result):
-    continue
-
-  show_id_match = re.match(show_id_regex, mandatoryParams)
-
-  if (not show_id_match):
-    continue
-
-  show_id = show_id_match.group(1)
-  break
-  
-
-
-i = 0
+print ("done")
 
 '''
-## USING THE SHOW_JSON_FIRST DUMP, WE CAN EXTRACT THE SHOW_ID & SHOW_SEASON_COUNT
-SHOW_ID=$(echo "$SHOW_JSON_FIRST" | jq -r '.included[].attributes.component.mandatoryParams' | grep -Eo '^pf.*$' | head -n1 | sed -e 's#pf\[show\.id\]\=##' | sed -e 's/&.*$//g')
-SHOW_SEASON_COUNT=$(echo "$SHOW_JSON_FIRST" | jq -r '.included[]? | .attributes.component.filters | values' | grep -Eo 'pf\[seasonNumber\].*$' | sed -e 's#pf\[seasonNumber\]=##g' -e 's#",##g')
-
-
-## NOW WE'LL LOOP THRU EACH SEASON TO GRAB ALL EPISODE URLS AND PUT THEM IN INPUT_URLS.txt
-for SEASON_NUMBER in $(echo "$SHOW_SEASON_COUNT"); do
-  curl -s "https://us1-prod-direct.discoveryplus.com/cms/collections/89438300356657080631189351362572714453?include=default&decorators=viewingHistory,isFavorite,playbackAllowed&pf\[seasonNumber\]=${SEASON_NUMBER}&pf\[show.id\]=${SHOW_ID}" \
-    -H 'authority: us1-prod-direct.discoveryplus.com' \
-    -H 'x-disco-client: WEB:UNKNOWN:dplus_us:prod' \
-    -H 'x-disco-params: realm=go,siteLookupKey=dplus_us,features=ar' \
-    -H 'referer: https://www.discoveryplus.com/' \
-    -H 'accept-language: en' \
-    --cookie "${COOKIE_FILE}" | jq -r '.included[]? | .attributes | .path' | sed -e 's#null##g' -e '/^$/d' | sed -e 's#^#https://www.discoveryplus.com/video/#g' >> "$EPISODE_URL_LIST"
-done
-
-
-## LET'S GET THE TOTAL EPISODE COUNT & SET IT TO A VARIABLE
-EPISODE_COUNT=$(cat "$EPISODE_URL_LIST" | wc -l) && clear
-SEASONS_SUM=$(echo "$SHOW_SEASON_COUNT" | wc -l)
-
-
-## BRAG ABOUT WHAT WE FOUND
-centerCOLOR_ONE "$SEASONS_SUM Seasons Found!" && sleep 1 && echo ""
-centerCOLOR_TWO "$EPISODE_COUNT Episodes Found!" && sleep 3 && echo "" && echo ""
-read -n 1 -s -r -p "`centerBLINK '_-Press Any Key to Begin Downloading The Episodes-_'`"
-
 
 ### Now We Sit Back and Have YT-DLP Download Every Episode We Found From Our TXT File
 ## Create a function so we can multi-thread

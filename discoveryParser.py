@@ -1,6 +1,8 @@
 from http.cookiejar import MozillaCookieJar
+from discoveryShow import DiscoveryShow
 import os
 import pathlib
+import re
 import requests
 
 class DiscoveryParser:
@@ -9,62 +11,144 @@ class DiscoveryParser:
 
         if (os.path.exists(config['cookiePath'])):
             self.cookiePath = config['cookiePath']
+
+            self._cj = MozillaCookieJar(self.cookiePath)
+            self._cj.load(ignore_discard=True, ignore_expires=True)
+            s = requests.Session()
+            s.headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36",
+                "authority": "us1-prod-direct.discoveryplus.com",
+                "x-disco-client": "WEB:UNKNOWN:dplus_us:1.8.0",
+                "x-disco-params": "realm=go,siteLookupKey=dplus_us,features=ar",
+                "accept": "*/*",
+                "accept-language": "en-US,en;q=0.9"
+            }
+            
+            s.cookies = self._cj
+            self._session = s
     
     def retrieveShowData(self, url):
-        cj = MozillaCookieJar(self.cookiePath)
-        cj.load(ignore_discard=True, ignore_expires=True)
-
         url_slug = "deadliest-catch"
 
-        s = requests.Session()
-        s.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36",
-            "authority": "us1-prod-direct.discoveryplus.com",
-            "x-disco-client": "WEB:UNKNOWN:dplus_us:1.8.0",
-            "x-disco-params": "realm=go,siteLookupKey=dplus_us,features=ar",
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9"
-        }
+        show_data = self._retrieveShowMetadata(url_slug)
 
-        s.cookies = cj
+        return show_data
 
-        result = s.get(f"https://us1-prod-direct.discoveryplus.com/cms/routes/show/{url_slug}?include=default&decorators=viewingHistory,isFavorite,playbackAllowed")
+    def _retrieveShowMetadata(self, url_slug):
+        result = self._session.get(f"https://us1-prod-direct.discoveryplus.com/cms/routes/show/{url_slug}?include=default&decorators=viewingHistory,isFavorite,playbackAllowed")
 
-        cj.save(ignore_discard=True, ignore_expires=True)
+        result_data = result.json()
 
-        return result.json()
+        return self._parseShowMetadata(result_data, url_slug)
 
+    def _parseShowMetadata(self, result_data, url_slug):        
+        show = DiscoveryShow(url_slug)
+        included = result_data['included']
 
+        show_id = None
 
+        season_count = 0
 
+        for include in included:
+            if (not 'attributes' in include):
+                continue
 
-# -H 'authority: us1-prod-direct.discoveryplus.com' \
-#  -H 'x-disco-client: WEB:UNKNOWN:dplus_us:1.8.0' \
-#3  -H 'x-disco-params: realm=go,siteLookupKey=dplus_us,features=ar' \
-#  -H 'accept: */*' \
-#  -H 'accept-language: en-US,en;q=0.9' \
+            attributes = include['attributes']
 
+            if (not 'component' in attributes):
+                continue
 
+            component = attributes['component']
 
-#        import os
-#import pathlib
-#import requests
-#from http.cookiejar import MozillaCookieJar
+            if (not show_id):
+                show_id = self._getShowId(component)
 
+            season_result = self._getSeasonResult(component)
 
-#cookiesFile = str(pathlib.Path(__file__).parent.absolute() / "cookies.txt")  # Places "cookies.txt" next to the script file.
-#cj = MozillaCookieJar(cookiesFile)
-#if os.path.exists(cookiesFile):  # Only attempt to load if the cookie file exists.
-#    cj.load(ignore_discard=True, ignore_expires=True)  # Loads session cookies too (expirydate=0).
+            if (season_result):
+                season_count = max(season_count, season_result)
+           
+        show.showId = show_id
+        show.totalSeasons = season_count
 
-#s = requests.Session()
-#s.headers = {
-#    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36",
-#    "Accept-Language": "en-US,en"
-#}
-#s.cookies = cj  # Tell Requests session to use the cookiejar.
+        show.episodeUrls.extend(self._getEpisodeUrls(show_id, season_count))
 
-# DO STUFF HERE WHICH REQUIRES THE PERSISTENT COOKIES...
-#s.get("https://www.somewebsite.com/")
+        return show
 
-#cj.save(ignore_discard=True, ignore_expires=True)  # Saves session cookies too (expirydate=0).
+    def _getShowId(self, component):
+        show_id_regex = '.*pf\[show\.id\]=(\d+).*'
+        show_entry_regex = ".*pf\[show\.id\].*"
+
+        if (not 'mandatoryParams' in component):
+            return None
+
+        mandatoryParams = component['mandatoryParams']
+
+        result = re.match(show_entry_regex, mandatoryParams)
+
+        if (not result):
+            return None
+
+        show_id_match = re.match(show_id_regex, mandatoryParams)
+
+        if (not show_id_match):
+            return None
+
+        return show_id_match.group(1)
+
+    def _getSeasonResult(self, component):
+        max_season = 0
+        season_num_regex = '.*pf\[seasonNumber\]=\d+.*'
+
+        if (not 'filters' in component):
+            return 0
+
+        filters = component['filters']
+
+        if (len(filters) == 0):
+            return 0
+
+        first_filter = filters[0]
+
+        if (not 'options' in first_filter):
+            return 0
+
+        options = first_filter['options']
+
+        for option in options:
+            if (re.match(season_num_regex, option['parameter'])):
+                max_season = max(int(option['value']), max_season)
+
+        return max_season
+
+    def _getEpisodeUrls(self, show_id, season_count):
+        urls = []
+
+        for season in range(0, season_count + 1):
+            season_url = f"https://us1-prod-direct.discoveryplus.com/cms/collections/89438300356657080631189351362572714453?include=default&decorators=viewingHistory,isFavorite,playbackAllowed&pf[seasonNumber]={season}&pf[show.id]={show_id}"
+
+            response = self._session.get(season_url)
+
+            data = response.json()
+
+            if (not 'included' in data):
+                continue
+
+            included = data['included']
+
+            for include in included:
+                if (not 'attributes' in include):
+                    continue
+
+                attributes = include['attributes']
+
+                if (not 'path' in attributes):
+                    continue
+
+                
+                url_slug = attributes['path']
+
+                urls.append(f"https://www.discoveryplus.com/video/{url_slug}")
+
+            
+        return urls
