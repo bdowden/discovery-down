@@ -1,24 +1,27 @@
 from discoveryParser import DiscoveryParser
 from discoveryShow import DiscoveryShow
+from discoveryDownloader import DiscoveryDownloader
 import pathlib
 import subprocess
+import asyncio
 
-cookiePath = str(pathlib.Path(__file__).parent.absolute() / "cookie.txt") 
+async def main():
 
-parser = DiscoveryParser({"cookiePath": cookiePath})
+  cookiePath = str(pathlib.Path(__file__).parent.absolute() / "cookie.txt") 
 
-show = parser.retrieveShowData("")
+  parser = DiscoveryParser({"cookiePath": cookiePath})
 
-url = show.episodeUrls[0]
+  show = parser.retrieveShowData("https://www.discoveryplus.com/show/mystery-diners")
 
-args = ["yt-dlp", "--cookies", f"{cookiePath}", "-v", "--hls-prefer-ffmpeg", "--extractor-retries", "10", "--ignore-config", "-N50", "-o", "S%(season_number)02dE%(episode_number)02d.%(title)s.%(ext)s", url]
+  downloader = DiscoveryDownloader()
 
-result = subprocess.run (args, capture_output=True, text=True)
+  downloader.downloadShow(show, cookiePath)
 
-print ('err: ', result.stderr)
-print ('output: ', result.stdout)
+asyncio.run (main())
+
 
 print ("done")
+
 
 '''
 

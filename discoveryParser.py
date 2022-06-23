@@ -28,7 +28,14 @@ class DiscoveryParser:
             self._session = s
     
     def retrieveShowData(self, url):
-        url_slug = "deadliest-catch"
+        url_slug_regex = '^.*\/show\/(.*)$'
+
+        result = re.match(url_slug_regex, url)
+
+        if (not result):
+            return None
+
+        url_slug = result.group(1)
 
         show_data = self._retrieveShowMetadata(url_slug)
 
