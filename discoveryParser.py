@@ -1,9 +1,13 @@
 from http.cookiejar import MozillaCookieJar
 from discoveryShow import DiscoveryShow
+from discoveryShow import DiscoverySeason
+from discoveryShow import DiscoveryEpisode
 import os
 import pathlib
 import re
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 class DiscoveryParser:
     def __init__(self, config):
@@ -14,7 +18,12 @@ class DiscoveryParser:
 
             self._cj = MozillaCookieJar(self.cookiePath)
             self._cj.load(ignore_discard=True, ignore_expires=True)
+
+            self.retry = Retry(connect = 3, backoff_factor=0.5)
+            self.adapter = HTTPAdapter(max_retries=self.retry)
             s = requests.Session()
+            s.mount('http://', self.adapter)
+            s.mount('https://', self.adapter)
             s.headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36",
                 "authority": "us1-prod-direct.discoveryplus.com",
@@ -78,7 +87,7 @@ class DiscoveryParser:
         show.showId = show_id
         show.totalSeasons = season_count
 
-        show.episodeUrls.extend(self._getEpisodeUrls(show_id, season_count))
+        self._getEpisodeUrls(show, season_count)
 
         return show
 
@@ -128,10 +137,16 @@ class DiscoveryParser:
 
         return max_season
 
-    def _getEpisodeUrls(self, show_id, season_count):
+    def _getEpisodeUrls(self, show, season_count):
         urls = []
 
+        show_id = show.showId
+
         for season in range(0, season_count + 1):
+
+            discSeason = DiscoverySeason(season, show)
+            show.seasons.append(discSeason)
+
             season_url = f"https://us1-prod-direct.discoveryplus.com/cms/collections/89438300356657080631189351362572714453?include=default&decorators=viewingHistory,isFavorite,playbackAllowed&pf[seasonNumber]={season}&pf[show.id]={show_id}"
 
             response = self._session.get(season_url)
@@ -151,11 +166,9 @@ class DiscoveryParser:
 
                 if (not 'path' in attributes):
                     continue
-
-                
+                              
                 url_slug = attributes['path']
 
-                urls.append(f"https://www.discoveryplus.com/video/{url_slug}")
+                episode = DiscoveryEpisode(discSeason, discSeason.episodeCount + 1, url_slug)
 
-            
-        return urls
+                discSeason.episodes.append(episode)
