@@ -20,3 +20,17 @@ class DiscoveryShow:
 
     def addEpisodeUrl(self, url):
         self.episodeUrls.append(url)
+
+class DiscoverySeason:
+    def __init__(self, seasonNumber: int):
+        self.seasonNumber = seasonNumber
+        self.episodes = []
+
+    @property 
+    def episodeCount(self):
+        return len(self.episodeUrls)
+
+class DiscoveryEpisode:
+    def __init__(self, episodeNum: int, url: string):
+        self.episodeNum = episodeNum
+        self.url = url
