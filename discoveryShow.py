@@ -31,6 +31,6 @@ class DiscoverySeason:
         return len(self.episodeUrls)
 
 class DiscoveryEpisode:
-    def __init__(self, episodeNum: int, url: string):
+    def __init__(self, episodeNum: int, url: str):
         self.episodeNum = episodeNum
         self.url = url
