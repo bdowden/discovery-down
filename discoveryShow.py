@@ -1,6 +1,6 @@
 
 class DiscoveryShow:
-    def __init__(self, slug):
+    def __init__(self, slug: string):
         self.slug = slug
         self.totalSeasons = 0
         self.episodeUrls = []
@@ -19,9 +19,6 @@ class DiscoveryShow:
     def showId(self, value):
         self._show_id = value
 
-    def addEpisodeUrl(self, url):
-        self.episodeUrls.append(url)
-
 class DiscoverySeason:
     def __init__(self, seasonNumber: int, show: DiscoveryShow):
         self.show = show
@@ -37,3 +34,12 @@ class DiscoveryEpisode:
         self.season = season
         self.episodeNum = episodeNum
         self.url = url
+        self._isDownloaded: bool = false
+
+    @property
+    def isDownloaded(self):
+        return self._isDownloaded
+
+    @isDownloaded.setter
+    def isDownloaded(self, value: bool):
+        self._isDownloaded = value
