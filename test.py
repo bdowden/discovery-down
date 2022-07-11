@@ -1,21 +1,41 @@
 from discoveryParser import DiscoveryParser
-from discoveryShow import DiscoveryShow
 from discoveryDownloader import DiscoveryDownloader
+
+from api.data import Data
+
 import pathlib
 import subprocess
 import asyncio
+
+from orm.common import Base, engine, sessionMaker
+
+from orm.show import Show
+from orm.episode import Episode
+from orm.season import Season
+
+Base.metadata.create_all(engine)
 
 async def main():
 
   cookiePath = str(pathlib.Path(__file__).parent.absolute() / "cookie.txt") 
 
-  parser = DiscoveryParser({"cookiePath": cookiePath})
+  session = sessionMaker()
+
+  parser = DiscoveryParser({"cookiePath": cookiePath}, session)
 
   show = parser.retrieveShowData("https://www.discoveryplus.com/show/mystery-diners")
 
-  downloader = DiscoveryDownloader()
+  session.commit()
 
-  downloader.downloadShow(show, cookiePath)
+#  d = Data(session)
+
+#  print(d.retrieveCaps())
+
+  #d.retrieveQuery()
+
+  #downloader = DiscoveryDownloader()
+
+  #downloader.downloadShow(show, cookiePath)
 
 asyncio.run (main())
 

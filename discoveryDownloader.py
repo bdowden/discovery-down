@@ -1,4 +1,4 @@
-from discoveryShow import DiscoveryShow
+#from discoveryShow import DiscoveryShow
 import asyncio
 import aiohttp
 import subprocess
@@ -9,7 +9,7 @@ class DiscoveryDownloader:
         self.max_concurrent_downloads = 4
         self.cookiePath = cookiePath
 
-    async def downloadShow(self, show: DiscoveryShow):
+    async def downloadShow(self, show):
         queue = asyncio.Queue(self.max_concurrent_downloads)
         
         consumers = [asyncio.create_task(self._downloadEpisode(queue))

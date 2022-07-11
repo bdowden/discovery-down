@@ -3,3 +3,5 @@ requests
 aiohttp
 flask
 sqlalchemy
+mako
+watchdog

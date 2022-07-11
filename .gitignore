@@ -132,3 +132,4 @@ dmypy.json
 # Custom ignores
 cookie.txt
 **/.vscode/
+sample*.json

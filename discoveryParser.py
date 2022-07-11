@@ -1,16 +1,23 @@
 from http.cookiejar import MozillaCookieJar
-from discoveryShow import DiscoveryShow
-from discoveryShow import DiscoverySeason
-from discoveryShow import DiscoveryEpisode
+
+from orm.show import Show
+from orm.season import Season
+from orm.episode import Episode
+
 import os
 import pathlib
 import re
 import requests
+import datetime
+import json
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from sqlalchemy import select
+
+import json
 
 class DiscoveryParser:
-    def __init__(self, config):
+    def __init__(self, config, dbSession):
         self.config = config
 
         if (os.path.exists(config['cookiePath'])):
@@ -35,6 +42,7 @@ class DiscoveryParser:
             
             s.cookies = self._cj
             self._session = s
+            self.database = dbSession
     
     def retrieveShowData(self, url):
         url_slug_regex = '^.*\/show\/(.*)$'
@@ -51,14 +59,23 @@ class DiscoveryParser:
         return show_data
 
     def _retrieveShowMetadata(self, url_slug):
-        result = self._session.get(f"https://us1-prod-direct.discoveryplus.com/cms/routes/show/{url_slug}?include=default&decorators=viewingHistory,isFavorite,playbackAllowed")
+        result = self._session.get(f"https://us1-prod-direct.discoveryplus.com/cms/routes/show/{url_slug}?include=default")
 
         result_data = result.json()
 
+        with open('/config/projects/discovery-down/show.json', 'wb') as outf:
+            outf.write(result.content)
+
         return self._parseShowMetadata(result_data, url_slug)
 
-    def _parseShowMetadata(self, result_data, url_slug):        
-        show = DiscoveryShow(url_slug)
+    def _parseShowMetadata(self, result_data, url_slug):
+
+        show = self.database.scalars(select(Show).where(Show.slug == url_slug)).first()
+
+        if (not show):
+            show = Show(slug = url_slug)
+            self.database.add(show)
+
         included = result_data['included']
 
         show_id = None
@@ -66,10 +83,15 @@ class DiscoveryParser:
         season_count = 0
 
         for include in included:
-            if (not 'attributes' in include):
+            attributes = include.get('attributes') or None
+
+            if (not attributes):
                 continue
 
-            attributes = include['attributes']
+            type = include.get('type') or None
+
+            if (type == "page"):
+                show.title = attributes.get('title')
 
             if (not 'component' in attributes):
                 continue
@@ -84,8 +106,7 @@ class DiscoveryParser:
             if (season_result):
                 season_count = max(season_count, season_result)
            
-        show.showId = show_id
-        show.totalSeasons = season_count
+        show.id = show_id
 
         self._getEpisodeUrls(show, season_count)
 
@@ -140,12 +161,15 @@ class DiscoveryParser:
     def _getEpisodeUrls(self, show, season_count):
         urls = []
 
-        show_id = show.showId
+        show_id = show.id
 
         for season in range(0, season_count + 1):
 
-            discSeason = DiscoverySeason(season, show)
-            show.seasons.append(discSeason)
+            discSeason = next(filter(lambda s: s.num == season, show.seasons), None)
+
+            if (not discSeason):
+                discSeason = Season(num = season)
+                show.seasons.append(discSeason)
 
             season_url = f"https://us1-prod-direct.discoveryplus.com/cms/collections/89438300356657080631189351362572714453?include=default&decorators=viewingHistory,isFavorite,playbackAllowed&pf[seasonNumber]={season}&pf[show.id]={show_id}"
 
@@ -153,22 +177,46 @@ class DiscoveryParser:
 
             data = response.json()
 
+            with open('/config/projects/discovery-down/season.json', 'wb') as outf:
+                outf.write(response.content)
+
             if (not 'included' in data):
                 continue
 
-            included = data['included']
+            included = data.get('included')
 
             for include in included:
-                if (not 'attributes' in include):
-                    continue
+                attributes = include.get('attributes')
 
-                attributes = include['attributes']
-
-                if (not 'path' in attributes):
+                if (not attributes):
                     continue
                               
-                url_slug = attributes['path']
+                url = attributes.get('path')
 
-                episode = DiscoveryEpisode(discSeason, discSeason.episodeCount + 1, url_slug)
+                if (not url):
+                    continue
 
-                discSeason.episodes.append(episode)
+                id = include.get('id')
+
+                airDate = attributes.get('airDate')
+
+                publishDate = attributes.get('publishStart')
+
+                episodeNum = attributes.get('episodeNumber')
+
+                resolution = attributes.get('videoResolution')
+
+                ad = self.convertToDate(airDate)
+                pd = self.convertToDate(publishDate)
+
+                episode = self.database.scalars(select(Episode).where(Episode.id == id).where(Episode.seasonId == discSeason.id)).first()
+
+                if (not episode):
+                    episode = Episode(id = id, num = episodeNum, url = url, title = attributes.get('name'), airDate = ad, publishDate = pd)
+                    discSeason.episodes.append(episode)
+
+                if (episode.resolution != resolution):
+                    episode.resolution = resolution
+
+    def convertToDate(self, value):
+        return datetime.datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ')
