@@ -8,20 +8,22 @@ class DiscoveryDownloader:
     def __init__(self, cookiePath: str):
         self.max_concurrent_downloads = 4
         self.cookiePath = cookiePath
-
-    async def downloadShow(self, show):
-        queue = asyncio.Queue(self.max_concurrent_downloads)
-        
-        consumers = [asyncio.create_task(self._downloadEpisode(queue))
+        self.queue = asyncio.Queue(self.max_concurrent_downloads)
+        self.consumers = [asyncio.create_task(self._downloadEpisode(self.queue))
                         for _ in range(self.max_concurrent_downloads)]
 
-        
-        for url in show.episodeUrls:
-            await queue.put(url)
+    async def downloadEpisode(self, url: str):
+        await self.queue.put(url)
 
-        await queue.join()
-        print("All episodes downloaded")
-        
+        i = 0
+        #await self.queue.join()
+
+#async def downloadShow(self, show):
+ #       for url in show.episodeUrls:
+  #          await queue.put(url)
+#
+ #       await queue.join()
+  #      print("All episodes downloaded")
 
     async def _downloadEpisode(self, queue):
         while True:

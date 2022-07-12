@@ -14,4 +14,3 @@ class Episode(Base):
     airDate = Column('AirDate', DateTime)
     publishDate = Column('PublishDate', DateTime)
     resolution = Column('Resolution', Integer, default = 0)
-    
