@@ -22,13 +22,14 @@ Base.metadata.create_all(engine)
 
 api = Flask(__name__)
 
+def getDownloadUrl(episodeId):
+    return urllib.parse.urljoin(request.host_url, url_for('retrieveNzb', episodeId = episodeId))
+
+
+d = Data(sessionMaker(), getDownloadUrl)
+
 @api.route('/api/', methods=['GET'], strict_slashes=False)
 def search():
-
-    def getDownloadUrl(episodeId):
-        return urllib.parse.urljoin(request.host_url, url_for('retrieveNzb', episodeId = episodeId))
-
-    d = Data(sessionMaker(), getDownloadUrl)
 
     queryData = request.args.to_dict()
 
@@ -41,8 +42,6 @@ def search():
 @api.route('/data/<int:episodeId>', methods=['GET'], strict_slashes = False)
 def retrieveNzb(episodeId: int):
 
-    d = Data(sessionMaker(), None)
-
     nzb = d.retrieveNzb(episodeId)
 
     r = Response(response=nzb, status=200)
@@ -52,6 +51,11 @@ def retrieveNzb(episodeId: int):
     r.headers['X-DNZB-Category'] = 'TV'
     r.headers['Content-Disposition'] = 'attachment; filename="{ep}.nzb"'.format(ep = episodeId)
     return r
+
+@api.route('/show', methods=['PUT'], strict_slashes = False)
+def addShow(tvdbId: int):
+    return ''
+
 
 def start(port: Optional[str] = '8985'):
     api.run(host='0.0.0.0', port=port)

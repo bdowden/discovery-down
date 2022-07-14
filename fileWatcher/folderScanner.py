@@ -2,6 +2,8 @@ from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 from fileWatcher.discoveryNzbParser import DiscoveryNzbParser
 
+import os
+
 class FolderScanner:
     def __init__(self, path: str):
         self.path = path
@@ -23,7 +25,12 @@ class FolderScanner:
         self.observer.join()
 
     def on_created(self, event):
-        epId = self.fileParser.retrieveEpisodeId(event.src_path)
+        path = event.src_path
+        epId = self.fileParser.retrieveEpisodeId(path)
+
+        file = os.path.basename(path)
+
+        fileName = os.path.splitext(file)[0]
 
         if (self.onEpisodeDownloadRequested):
-            self.onEpisodeDownloadRequested(epId)
+            self.onEpisodeDownloadRequested(epId, fileName)

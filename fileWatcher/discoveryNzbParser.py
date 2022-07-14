@@ -2,9 +2,6 @@ import xml.etree.ElementTree as ET
 
 
 class DiscoveryNzbParser:
-    def __init__(self):
-        self.t = ''
-
     def retrieveEpisodeId(self, filePath: str):
         elementTree = ET.parse(filePath)
         root = elementTree.getroot()

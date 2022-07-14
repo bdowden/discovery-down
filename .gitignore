@@ -133,3 +133,5 @@ dmypy.json
 cookie.txt
 **/.vscode/
 sample*.json
+
+**/*.sqlite

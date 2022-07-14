@@ -13,6 +13,7 @@ import json
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from sqlalchemy import select
+from urllib.parse import urljoin
 
 import json
 
@@ -191,10 +192,13 @@ class DiscoveryParser:
                 if (not attributes):
                     continue
                               
-                url = attributes.get('path')
+                url_slug = attributes.get('path')
 
-                if (not url):
+                if (not url_slug):
                     continue
+
+
+                url = urljoin('https://www.discoveryplus.com/video/', url_slug)
 
                 id = include.get('id')
 
