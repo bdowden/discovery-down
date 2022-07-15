@@ -52,8 +52,8 @@ def retrieveNzb(episodeId: int):
     r.headers['Content-Disposition'] = 'attachment; filename="{ep}.nzb"'.format(ep = episodeId)
     return r
 
-@api.route('/show', methods=['PUT'], strict_slashes = False)
-def addShow(tvdbId: int):
+@api.route('/api/show/search/<str:term>', methods=['GET'], strict_slashes = False)
+def showSearch(term: str):
     return ''
 
 

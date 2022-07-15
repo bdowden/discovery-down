@@ -5,3 +5,4 @@ flask
 sqlalchemy
 mako
 watchdog
+aiopyarr

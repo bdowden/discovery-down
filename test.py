@@ -13,19 +13,43 @@ from orm.show import Show
 from orm.episode import Episode
 from orm.season import Season
 
+from api.showSearcher import ShowSearcher
+from discoveryApi.api import DiscoveryApi
+
 Base.metadata.create_all(engine)
 
 async def main():
 
-  cookiePath = str(pathlib.Path(__file__).parent.absolute() / "cookie.txt") 
+  apiKey = "4db3b3ee8d6e4614932c26970c2972ad"
+  ipAddress = "192.168.2.83"
+  port = 8987
 
-  session = sessionMaker()
+#  searcher = ShowSearcher(ipAddress, port, apiKey)
 
-  parser = DiscoveryParser({"cookiePath": cookiePath}, session)
+#  results = await searcher.searchShow("hell's kitchen")
 
-  show = parser.retrieveShowData("https://www.discoveryplus.com/show/mystery-diners")
 
-  session.commit()
+
+  cookiePath = str(pathlib.Path(__file__).parent.absolute() / "cookie.txt")
+  pickledCookiePath = str(pathlib.Path(__file__).parent.absolute() / "pickled.cookies.txt") 
+
+  disc = DiscoveryApi({'cookiePath': cookiePath, 'pickleCookiePath': pickledCookiePath})
+
+  await disc.search("hell's kitchen")
+
+
+  i = 0
+
+
+  #session = sessionMaker()
+
+  #parser = DiscoveryParser({"cookiePath": cookiePath}, session)
+
+  #show = parser.retrieveShowData("https://www.discoveryplus.com/show/mystery-diners")
+
+  #session.commit()
+
+
 
 #  d = Data(session)
 
