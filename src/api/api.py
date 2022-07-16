@@ -36,6 +36,15 @@ def getDownloadUrl(episodeId):
 d = Data(sessionMaker, getDownloadUrl)
 
 addShowToDatabase = None
+updateShows = None
+
+@api.route('/show/update', methods=['GET'], strict_slashes=False)
+def updateShows():
+    if (not updateShows):
+        return Response('Fail', 500)
+
+    updateShows()
+    return Response('Success', 200)
 
 @api.route('/show', methods=["POST"], strict_slashes=False)
 def addShow():

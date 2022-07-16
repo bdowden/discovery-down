@@ -28,14 +28,8 @@ class DiscoveryDown:
         self.scanner.start()
         await self.downloader.start()
 
-    async def updateShows(self):
-        while True:
-
-            sleepSeconds = 60 * 60 * 3 #3 hour - 60 seconds * 60 minutes * 3
-
-            await asyncio.sleep(sleepSeconds * 1000)
-
-            self.parser.updateAllShowData()
+    def updateShows(self):
+        self.parser.updateAllShowData()
 
     def downloadEpisode(self, episodeId, fileName):
         epId = int(episodeId)
@@ -66,10 +60,19 @@ async def main():
     config = Config(watchPath="/pickup", downloadPath="/download", cookiePath=cookiePath)
     down = DiscoveryDown(config)
     api.api.addShowToDatabase = down.addShow
+    api.api.updateShows = down.updateShows
 
     downloaderTask = down.start()
 
-    updateTask = down.updateShows()
+    async def update():
+        while True:
+            sleepSeconds = 60 * 60 * 3 #3 hour - 60 seconds * 60 minutes * 3
+
+            await asyncio.sleep(sleepSeconds * 1000)
+
+            down.updateShows()
+
+    updateTask = update()
 
     apiServerTask = loop.run_in_executor(None, api.api.start)
 
