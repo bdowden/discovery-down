@@ -8,3 +8,4 @@ class Show(Base):
     slug = Column('Slug', String)
     title = Column('Title', String)
     seasons = relationship("Season", back_populates="show")
+    tvdbId = Column('TvdbId', String)

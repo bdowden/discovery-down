@@ -15,6 +15,7 @@ from orm.season import Season
 
 from api.showSearcher import ShowSearcher
 from discoveryApi.api import DiscoveryApi
+from discoveryApi.searchResult import DiscoveryShow, DiscoveryShowParser
 
 Base.metadata.create_all(engine)
 
@@ -31,12 +32,14 @@ async def main():
 
 
   cookiePath = str(pathlib.Path(__file__).parent.absolute() / "cookie.txt")
-  pickledCookiePath = str(pathlib.Path(__file__).parent.absolute() / "pickled.cookies.txt") 
+  
+  disc = DiscoveryApi({'cookiePath': cookiePath})
 
-  disc = DiscoveryApi({'cookiePath': cookiePath, 'pickleCookiePath': pickledCookiePath})
+  results = await disc.search("hell's kitchen")
 
-  await disc.search("hell's kitchen")
+  parser = DiscoveryShowParser()
 
+  shows = parser.parseToDiscoveryShow(results)
 
   i = 0
 

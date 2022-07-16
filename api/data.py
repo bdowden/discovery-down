@@ -25,8 +25,8 @@ CAPS_TEMPLATE = Template(filename = os.path.join(templatePath, 'caps.template.ma
 NZB_TEMPLATE = Template(filename = os.path.join(templatePath, 'nzb.template.mako'))
 
 class Data:
-    def __init__(self, db, urlRetriever):
-        self.db = db
+    def __init__(self, dbSessionMaker, urlRetriever):
+        self.dbSessionMaker = dbSessionMaker
         self.urlRetriever = urlRetriever
 
     def retrieveData(self, queryData):
@@ -66,29 +66,33 @@ class Data:
 
     def retrieveQuery(self, queryData):
 
-        query = self.db.query(Episode)
+        with self.dbSessionMaker() as db:
+            query = db.query(Episode)
 
-        query = query.filter(Episode.isDownloaded == False)
+            season = queryData.get('season')
+            episode = queryData.get('ep')
+            q = queryData.get('q')
 
-        season = queryData.get('season')
-        episode = queryData.get('ep')
+            if (episode):
+                query = query.filter(Episode.num == int(episode))
 
-        if (episode):
-            query = query.filter(Episode.num == int(episode))
+            if (season):
+                query = query.join(Season, Season.id == Episode.seasonId)
+                query = query.filter(Season.num == int(season))
 
-        if (season):
-            query = query.join(Season, Season.id == Episode.seasonId)
-            query = query.filter(Season.num == int(season))
+            if (q):
+                query = query.join(Show, Show.id == Season.showId)
+                #query = query.filter(Show.title == q)
 
-        query = query.order_by(Episode.publishDate.desc())
+            query = query.order_by(Episode.publishDate.desc())
 
-        total = query.count()
+            total = query.count()
 
-        data = list(query)
+            data = list(query)
 
-        result = self._convertToResults(data, total)
+            result = self._convertToResults(data, total)
 
-        return result
+            return result
 
     def _convertToResults(self, data: List[Show], total: int):
         

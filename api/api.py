@@ -4,6 +4,8 @@ from flask import Response, request
 from typing import Optional
 
 from api.data import Data
+from mako.template import Template
+
 
 import pathlib
 import asyncio
@@ -22,11 +24,37 @@ Base.metadata.create_all(engine)
 
 api = Flask(__name__)
 
+absPath = str(pathlib.Path(__file__).parent.absolute())
+
+
+templatePath = str(absPath)
+ADD_SHOW_TEMPLATE = Template(filename = os.path.join(templatePath, 'addShow.template.mako'))
+
 def getDownloadUrl(episodeId):
     return urllib.parse.urljoin(request.host_url, url_for('retrieveNzb', episodeId = episodeId))
 
+d = Data(sessionMaker, getDownloadUrl)
 
-d = Data(sessionMaker(), getDownloadUrl)
+addShowToDatabase = None
+
+@api.route('/show', methods=["POST"], strict_slashes=False)
+def addShow():
+    data = request.form
+    url = data.get('dUrl') or None
+    tvdbId = data.get('tvdbId') or None
+
+    if (not addShowToDatabase):
+        return "addShowToDatabase is null"
+        
+    result = addShowToDatabase (url, tvdbId)
+
+    return result
+
+@api.route('/show', methods=['GET'], strict_slashes=False)
+def getAddShowPage():
+    postUrl = urllib.parse.urljoin(request.host_url, url_for('addShow'))
+    return ADD_SHOW_TEMPLATE.render(**{'postUrl': postUrl})
+
 
 @api.route('/api/', methods=['GET'], strict_slashes=False)
 def search():
@@ -52,8 +80,8 @@ def retrieveNzb(episodeId: int):
     r.headers['Content-Disposition'] = 'attachment; filename="{ep}.nzb"'.format(ep = episodeId)
     return r
 
-@api.route('/api/show/search/<str:term>', methods=['GET'], strict_slashes = False)
-def showSearch(term: str):
+#@api.route('/api/show/search/<str:term>', methods=['GET'], strict_slashes = False)
+def showSearch(term):
     return ''
 
 

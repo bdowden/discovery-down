@@ -4,6 +4,8 @@ from orm.show import Show
 from orm.season import Season
 from orm.episode import Episode
 
+from typing import Optional
+
 import os
 import pathlib
 import re
@@ -14,15 +16,16 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from sqlalchemy import select
 from urllib.parse import urljoin
+from config import Config
 
 import json
 
 class DiscoveryParser:
-    def __init__(self, config, dbSession):
+    def __init__(self, config: Config, dbSessionMaker):
         self.config = config
 
-        if (os.path.exists(config['cookiePath'])):
-            self.cookiePath = config['cookiePath']
+        if (os.path.exists(config.cookiePath)):
+            self.cookiePath = config.cookiePath
 
             self._cj = MozillaCookieJar(self.cookiePath)
             self._cj.load(ignore_discard=True, ignore_expires=True)
@@ -43,9 +46,22 @@ class DiscoveryParser:
             
             s.cookies = self._cj
             self._session = s
-            self.database = dbSession
+            self._dbSessionMaker = dbSessionMaker
+
+    def updateAllShowData(self):
+        shows = []
+
+        with self._dbSessionMaker() as database:
+            res = list(database.query(Show))
+
+            for result in res:
+                shows.append({'slug': result.slug, 'tvdbId': result.tvdbId})
+
+        for show in shows:
+            self._getShowMetadata(show.get('slug'), show.get('tvdbId'))
     
-    def retrieveShowData(self, url):
+    
+    def retrieveShowData(self, url: str, tvdbId: Optional[str] = None):
         url_slug_regex = '^.*\/show\/(.*)$'
 
         result = re.match(url_slug_regex, url)
@@ -55,27 +71,39 @@ class DiscoveryParser:
 
         url_slug = result.group(1)
 
-        show_data = self._retrieveShowMetadata(url_slug)
+        return self._getShowMetadata(url_slug, tvdbId)
 
-        return show_data
+    def _getShowMetadata(self, url_slug, tvdbId):
 
-    def _retrieveShowMetadata(self, url_slug):
+        with self._dbSessionMaker() as database:
+            show_data = self._retrieveShowMetadata(url_slug, tvdbId, database)
+
+            database.commit()
+            database.flush()
+
+            return show_data
+
+
+    def _retrieveShowMetadata(self, url_slug, tvdbId, database):
         result = self._session.get(f"https://us1-prod-direct.discoveryplus.com/cms/routes/show/{url_slug}?include=default")
 
         result_data = result.json()
 
-        with open('/config/projects/discovery-down/show.json', 'wb') as outf:
-            outf.write(result.content)
+        #with open('/config/projects/discovery-down/show.json', 'wb') as outf:
+        #    outf.write(result.content)
 
-        return self._parseShowMetadata(result_data, url_slug)
+        return self._parseShowMetadata(result_data, url_slug, tvdbId, database)
 
-    def _parseShowMetadata(self, result_data, url_slug):
+    def _parseShowMetadata(self, result_data, url_slug, tvdbId, database):
 
-        show = self.database.scalars(select(Show).where(Show.slug == url_slug)).first()
+        show = database.scalars(select(Show).where(Show.slug == url_slug)).first()
 
         if (not show):
             show = Show(slug = url_slug)
-            self.database.add(show)
+            database.add(show)
+
+        if (show.tvdbId != tvdbId and tvdbId != None):
+            show.tvdbId = tvdbId
 
         included = result_data['included']
 
@@ -109,7 +137,7 @@ class DiscoveryParser:
            
         show.id = show_id
 
-        self._getEpisodeUrls(show, season_count)
+        self._getEpisodeUrls(show, season_count, database)
 
         return show
 
@@ -159,7 +187,7 @@ class DiscoveryParser:
 
         return max_season
 
-    def _getEpisodeUrls(self, show, season_count):
+    def _getEpisodeUrls(self, show, season_count, database):
         urls = []
 
         show_id = show.id
@@ -177,9 +205,6 @@ class DiscoveryParser:
             response = self._session.get(season_url)
 
             data = response.json()
-
-            with open('/config/projects/discovery-down/season.json', 'wb') as outf:
-                outf.write(response.content)
 
             if (not 'included' in data):
                 continue
@@ -213,7 +238,7 @@ class DiscoveryParser:
                 ad = self.convertToDate(airDate)
                 pd = self.convertToDate(publishDate)
 
-                episode = self.database.scalars(select(Episode).where(Episode.id == id).where(Episode.seasonId == discSeason.id)).first()
+                episode = database.scalars(select(Episode).where(Episode.id == id).where(Episode.seasonId == discSeason.id)).first()
 
                 if (not episode):
                     episode = Episode(id = id, num = episodeNum, url = url, title = attributes.get('name'), airDate = ad, publishDate = pd)
